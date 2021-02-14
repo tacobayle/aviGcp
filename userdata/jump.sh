@@ -6,6 +6,7 @@ sudo apt install -y jq
 sudo apt install -y python-jmespath
 pip install ansible==${ansibleVersion}
 pip install avisdk==${avisdkVersion}
+pip3 install avisdk==${avisdkVersion}
 pip install requests
 pip install google-auth
 pip install dnspython

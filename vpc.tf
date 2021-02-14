@@ -1,6 +1,6 @@
 resource "google_compute_network" "vpc_network" {
-  name = var.gcp.vpcName
-  project = var.googleProject
+  name = var.gcp.vpc.name
+  project = var.gcp.project.name
   auto_create_subnetworks = false
 }
 

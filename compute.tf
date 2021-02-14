@@ -3,87 +3,63 @@ data "google_compute_zones" "available" {
 
 # Mysql server creation
 
-resource "google_compute_instance" "mysql" {
-  count = var.mysql.count
-  name = "mysql-${count.index + 1 }"
-  machine_type = var.mysql.type
-  zone = element(data.google_compute_zones.available.names, count.index)
-  boot_disk {
-    initialize_params {
-    image = var.mysql.image
-    }
-  }
-  metadata_startup_script =  file(var.mysql.userdata)
-  network_interface {
-    subnetwork = google_compute_subnetwork.subnetwork.1.id
-  }
-  metadata  = {
-    sshKeys = "ubuntu:${file(var.mysql.key)}"
-  }
-  labels = {
-    group = "mysql"
-    created_by = "terraform"
-  }
-}
+//resource "google_compute_instance" "mysql" {
+//  count = var.mysql.count
+//  name = "mysql-${count.index + 1 }"
+//  machine_type = var.mysql.type
+//  zone = element(data.google_compute_zones.available.names, count.index)
+//  boot_disk {
+//    initialize_params {
+//    image = var.mysql.image
+//    }
+//  }
+//  metadata_startup_script =  file(var.mysql.userdata)
+//  network_interface {
+//    subnetwork = google_compute_subnetwork.subnetwork.1.id
+//  }
+//  metadata  = {
+//    sshKeys = "ubuntu:${file(var.mysql.key)}"
+//  }
+//  labels = {
+//    group = "mysql"
+//    created_by = "terraform"
+//  }
+//}
 
 
-resource "google_compute_instance" "backend" {
-  count = var.backend.count
-  name = "backend-${count.index + 1 }"
-  machine_type = var.backend.type
-  zone = element(data.google_compute_zones.available.names, count.index)
-  boot_disk {
-    initialize_params {
-    image = var.backend.image
-    }
-  }
-  metadata_startup_script =  file(var.backend.userdata)
-  network_interface {
-    subnetwork = google_compute_subnetwork.subnetwork.1.id
-    #access_config {
-    #}
-  }
-  metadata  = {
-    sshKeys = "ubuntu:${file(var.backend.key)}"
-  }
-  labels = {
-    group = "backend"
-    created_by = "terraform"
-  }
-}
 
 # opencart server creation
 
-data "template_file" "opencart" {
-  template = file(var.opencart.userdata)
-  vars = {
-    opencartDownloadUrl = var.opencart.opencartDownloadUrl
-    domainName = var.avi_gslb.domain
-  }
-}
-
-resource "google_compute_instance" "opencart" {
-  count = var.opencart.count
-  name = "opencart-${count.index + 1 }"
-  machine_type = var.opencart.type
-  zone = element(data.google_compute_zones.available.names, count.index)
-  boot_disk {
-    initialize_params {
-    image = var.opencart.image
-    }
-  }
-  metadata_startup_script =  data.template_file.opencart.rendered
-  network_interface {
-    subnetwork = google_compute_subnetwork.subnetwork.1.id
-  }
-  metadata  = {
-    sshKeys = "ubuntu:${file(var.backend.key)}"
-  }
-  labels = {
-    group = "opencart"
-    created_by = "terraform"
-  }
-}
+//data "template_file" "opencart" {
+//  template = file(var.opencart.userdata)
+//  vars = {
+//    opencartDownloadUrl = var.opencart.opencartDownloadUrl
+//    domainName = var.gcp.domains[0].name
+//  }
+//}
+//
+//resource "google_compute_instance" "opencart" {
+//  count = var.opencart.count
+//  name = "opencart-${count.index + 1 }"
+//  machine_type = var.opencart.type
+//  zone = element(data.google_compute_zones.available.names, count.index)
+//  boot_disk {
+//    initialize_params {
+//    image = var.opencart.image
+//    }
+//  }
+//  metadata_startup_script =  data.template_file.opencart.rendered
+//  network_interface {
+//    subnetwork = google_compute_subnetwork.subnetwork.1.id
+//  }
+//  metadata  = {
+//    sshKeys = "ubuntu:${file(var.backend.key)}"
+//  }
+//  labels = {
+//    group = "opencart"
+//    created_by = "terraform"
+//  }
+//}
 
 
 # Jump server creation
@@ -97,7 +73,7 @@ data "template_file" "jump" {
     privateKey = var.privateKey
     username = var.jump.username
     ansibleGcpServiceAccount = var.ansible.gcpServiceAccount
-    googleProject = var.googleProject
+    googleProject = var.gcp.project.name
   }
 }
 
@@ -124,7 +100,7 @@ resource "google_compute_instance" "jump" {
     created_by = "terraform"
   }
   service_account {
-  email = var.googleEmail
+  email = var.gcp.email
   scopes = ["cloud-platform"]
   }
 
@@ -132,7 +108,7 @@ resource "google_compute_instance" "jump" {
     host        = self.network_interface.0.access_config.0.nat_ip
     type        = "ssh"
     agent       = false
-    user        = "ubuntu"
+    user        = var.jump.username
     private_key = file(var.privateKey)
   }
 
@@ -159,22 +135,10 @@ resource "google_compute_instance" "jump" {
   destination = "~/ansible"
   }
 
-  provisioner "file" {
-    content      = <<EOF
----
-googleDriveId: ${var.avi_googleId_gcp_20_1_3}
-bucketAvi: ${var.gcp.bucketName}
-googleEmail: ${var.googleEmail}
-googleProject: ${var.googleProject}
-EOF
-  destination = "~/gcp.yml"
-  }
-
-
   provisioner "remote-exec" {
     inline      = [
     "chmod 600 ${var.privateKey}",
-    "cd ~/ansible ; git clone https://github.com/tacobayle/ansibleGcpStorageImage ; ansible-playbook ansibleGcpStorageImage/local.yml --extra-vars @~/gcp.yml",
+    "cd ~/ansible ; git clone https://github.com/tacobayle/ansibleGcpStorageImage ; ansible-playbook ansibleGcpStorageImage/local.yml --extra-vars '{\"googleDriveId\": ${jsonencode(var.avi_googleId_gcp_20_1_3)}, \"bucketAvi\": ${jsonencode(var.gcp.bucket.name)}, \"googleEmail\": ${jsonencode(var.gcp.email)}, \"googleProject\": ${jsonencode(var.gcp.project.name)}}'",
     ]
   }
 
@@ -190,7 +154,7 @@ resource "google_compute_instance" "aviController" {
   boot_disk {
     device_name = var.controller.diskName
     initialize_params {
-    image = "projects/${var.googleProject}/global/images/avi-controller-image"
+    image = "projects/${var.gcp.project.name}/global/images/avi-controller-image"
     type = var.controller.diskType
     size = var.controller.diskSize
     }
@@ -208,7 +172,7 @@ resource "google_compute_instance" "aviController" {
     created_by = "terraform"
   }
   service_account {
-  email = var.googleEmail
+  email = var.gcp.email
   scopes = ["cloud-platform"]
   }
 }

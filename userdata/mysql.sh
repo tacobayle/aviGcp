@@ -4,8 +4,8 @@
 #
 sudo apt-get update
 sudo apt install -y mysql-server
-sudo apt install -y python-pip
-sudo apt install -y python-pip3
-pip install PyMySQL
+#sudo apt install -y python-pip
+sudo apt install -y python3-pip
+#pip install PyMySQL
 pip3 install PyMySQL
 echo "cloud init done" | tee /tmp/cloudInitDone.log
